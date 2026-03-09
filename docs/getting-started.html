@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Getting Started | 3D Cerebrovascular Shape Completion</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <main class="wrap">
+    <div class="doc-layout">
+      <nav class="sidebar">
+        <a href="index.html">&larr; Project Page</a>
+        <div class="sidebar-title">Guides</div>
+        <a class="active" href="getting-started.html">Getting Started</a>
+        <a href="clinical-data.html">Clinical Data</a>
+        <div class="sidebar-title">Reference</div>
+        <a href="dataset-schema.html">Dataset Format</a>
+        <a href="architecture.html">How It Works</a>
+      </nav>
+      <div class="doc-content">
+        <section class="hero">
+          <span class="eyebrow">Guide</span>
+          <h1>Getting Started</h1>
+          <p class="lede">
+            Install the environment, resolve the common CUDA and <code>uv</code> setup failures,
+            download the public TopBrain CTA data, and train your first 3D vessel reconstruction from sparse X-ray views.
+          </p>
+        </section>
+
+        <h2><span class="step-num">1</span> Prerequisites</h2>
+        <ul>
+          <li><code>uv</code></li>
+          <li>Python 3.10</li>
+          <li>Linux <code>x86_64</code></li>
+          <li>CUDA 11.8 toolkit with <code>nvcc</code></li>
+          <li>NVIDIA GPU with &ge; 8 GB VRAM</li>
+        </ul>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Supported Target</div>
+          <p>
+            This repository targets a pinned GPU Linux environment. For reproducible source builds,
+            stay on Linux <code>x86_64</code>, Python 3.10, and a CUDA 11.8 toolkit that matches the pinned PyTorch build.
+          </p>
+        </div>
+
+        <h2><span class="step-num">2</span> Installation</h2>
+
+        <p>
+          For most local machines, the short path is:
+        </p>
+        <pre><code>uv python install 3.10
+./scripts/uv.sh sync --verify</code></pre>
+        <p>
+          If you need help installing <code>uv</code>, setting up CUDA 11.8, or working on a cluster,
+          expand the section below.
+        </p>
+
+        <details class="expando">
+          <summary>Install and troubleshooting details</summary>
+
+        <h3>What You Need to Install First</h3>
+        <p>
+          This repository assumes a Linux machine or cluster login node with:
+        </p>
+        <ul>
+          <li><strong><code>uv</code></strong> for Python and dependency management</li>
+          <li><strong>CUDA 11.8</strong> with <code>nvcc</code> available in the shell used for installation</li>
+          <li><strong>build tools</strong> such as <code>gcc</code>, <code>g++</code>, <code>curl</code>, and <code>unzip</code></li>
+        </ul>
+        <p>
+          Official downloads and references:
+        </p>
+        <ul>
+          <li><a href="https://docs.astral.sh/uv/getting-started/installation/">uv installation guide</a></li>
+          <li><a href="https://developer.nvidia.com/cuda-toolkit-archive">CUDA Toolkit archive</a></li>
+          <li><a href="https://docs.nvidia.com/cuda/archive/11.8.0/cuda-installation-guide-linux/">CUDA 11.8 Linux installation guide</a></li>
+        </ul>
+
+        <h3>Environment Variables</h3>
+        <p>
+          The wrapper script reads these variables. You only need them when autodetection is not sufficient.
+        </p>
+        <table class="env-table">
+          <thead>
+            <tr><th>Variable</th><th>Purpose</th><th>Default</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>CUDA_HOME</code></td>
+              <td>Path to the CUDA 11.8 toolkit root</td>
+              <td>Auto-detected from <code>nvcc</code> on <code>PATH</code></td>
+            </tr>
+            <tr>
+              <td><code>CUDA_MATH_ROOT</code></td>
+              <td>Separate math-library root for split NVHPC layouts</td>
+              <td>Not set</td>
+            </tr>
+            <tr>
+              <td><code>CC</code> / <code>CXX</code></td>
+              <td>C / C++ compiler</td>
+              <td><code>gcc</code> / <code>g++</code></td>
+            </tr>
+            <tr>
+              <td><code>UV_CACHE_DIR</code></td>
+              <td><code>uv</code> cache location</td>
+              <td><code>.uv-cache</code> in the repo root</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>If Autodetection Fails</h3>
+        <p>Set <code>CUDA_HOME</code> explicitly and make sure <code>nvcc</code> is on <code>PATH</code>:</p>
+        <pre><code>export CUDA_HOME=/path/to/cuda-11.8
+export PATH="$CUDA_HOME/bin:$PATH"
+./scripts/uv.sh sync --verify</code></pre>
+
+        <h3>NVHPC Split Layouts</h3>
+        <p>
+          Some NVHPC installs split CUDA math headers and libraries out of the default toolkit root.
+          If TIGRE fails on CUDA math headers such as <code>curand_kernel.h</code>, set <code>CUDA_MATH_ROOT</code>:
+        </p>
+        <pre><code>export CUDA_MATH_ROOT=/path/to/math_libs/11.8/targets/x86_64-linux
+./scripts/uv.sh sync --verify</code></pre>
+        <p>
+          On some clusters you may also need <code>CPATH</code> or <code>LIBRARY_PATH</code>
+          to point at that split math installation.
+        </p>
+
+        <h3>Verification</h3>
+        <p>Rerun the full environment check at any time:</p>
+        <pre><code>./scripts/uv.sh verify</code></pre>
+        <p>For a deeper runtime check covering imports, GPU availability, and CUDA extensions:</p>
+        <pre><code>./scripts/uv.sh run python -m utils.verify_env --full</code></pre>
+
+        <h3>Common Setup Failures</h3>
+        <table>
+          <thead>
+            <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>uv not found on PATH</code></td>
+              <td><code>uv</code> is not installed or not visible in the current shell.</td>
+              <td>Install <code>uv</code> first and reopen the shell, or export the directory containing <code>uv</code> into <code>PATH</code>.</td>
+            </tr>
+            <tr>
+              <td><code>nvcc not found on PATH</code></td>
+              <td>The CUDA toolkit is not visible in the current shell.</td>
+              <td>Set <code>CUDA_HOME</code>, export <code>$CUDA_HOME/bin</code> into <code>PATH</code>, or load the correct cluster module.</td>
+            </tr>
+            <tr>
+              <td><code>torch.version.cuda=...</code> but <code>nvcc=...</code></td>
+              <td>PyTorch and the local CUDA toolkit do not match.</td>
+              <td>Use CUDA 11.8 for this repo or recreate the environment after switching toolkits.</td>
+            </tr>
+            <tr>
+              <td><code>curand_kernel.h</code> or other CUDA math headers missing</td>
+              <td>NVHPC split-layout install without the math-root path configured.</td>
+              <td>Set <code>CUDA_MATH_ROOT</code> and, if needed, add it to <code>CPATH</code> and <code>LIBRARY_PATH</code>.</td>
+            </tr>
+            <tr>
+              <td><code>Permission denied</code> or broken cache state in <code>uv</code></td>
+              <td>The cache directory is unwritable or stale.</td>
+              <td>Point <code>UV_CACHE_DIR</code> at a writable location, then rerun <code>./scripts/uv.sh sync --verify</code>.</td>
+            </tr>
+            <tr>
+              <td>CUDA extension import fails after changing compilers or toolkit</td>
+              <td>The existing environment was built against a different toolchain.</td>
+              <td>Remove <code>.venv</code> and rerun <code>./scripts/uv.sh sync --verify</code> from a clean shell.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        </details>
+
+        <h2><span class="step-num">3</span> Download Data</h2>
+        <p>
+          Download the <strong>CTA training release</strong> (Batches 1 &amp; 2) from the
+          <a href="https://topbrain2025.grand-challenge.org/data/">TopBrain data page</a>
+          or directly from the
+          <a href="https://zenodo.org/records/16878417">Zenodo release</a>,
+          then unzip it into <code>datasets/raw/</code>:
+        </p>
+        <pre><code>mkdir -p datasets/raw
+curl -L \"https://zenodo.org/records/16878417/files/TopBrain_Data_Release_Batches1n2_081425.zip?download=1\" \
+  -o datasets/raw/TopBrain_Data_Release_Batches1n2_081425.zip
+unzip datasets/raw/TopBrain_Data_Release_Batches1n2_081425.zip -d datasets/raw
+mv datasets/raw/TopBrain_Data_Release_Batches1n2_081425/{imagesTr,labelsTr}_topbrain_ct datasets/raw/</code></pre>
+
+        <p>After unzipping you should have:</p>
+        <pre><code>datasets/raw/
+  imagesTr_topbrain_ct/
+  labelsTr_topbrain_ct/</code></pre>
+        <p>
+          If your cluster blocks outbound downloads, fetch the ZIP locally, copy it to the cluster,
+          and run only the <code>unzip</code> and <code>mv</code> steps there.
+        </p>
+
+        <h2><span class="step-num">4</span> Generate Processed Datasets</h2>
+        <p>
+          The data generation pipeline converts raw CTA volumes into the training format:
+          synthetic DSA projections, vessel priors, and optional residual point clouds for context-point initialization.
+        </p>
+
+        <p>Generate a single case to test the pipeline:</p>
+        <pre><code>uv run python -m data_generation.topbrain.cli --batch --limit 1 --output-root datasets/processed/topbrain</code></pre>
+
+        <p>The pipeline reads paths from <code>project.yaml</code>:</p>
+        <pre><code>paths:
+  raw_datasets_dir: datasets/raw
+  datasets_dir: datasets/processed
+  results_dir: results</code></pre>
+
+        <p>
+          Each processed case produces a structured directory with views, priors, and residuals.
+          See <a href="dataset-schema.html">Dataset Format</a> for the full output layout.
+        </p>
+
+        <h2><span class="step-num">5</span> Train Your First Model</h2>
+        <p>Train a 2-view reconstruction (AP + LAT) on a single TopBrain case:</p>
+        <pre><code>uv run python train.py \
+  -s datasets/processed/topbrain/topcow_ct_001/views/v2_ap_lat \
+  -m results/2v_experiment \
+  --Nviews 2 --seed 42</code></pre>
+
+        <p>
+          Prior and residual paths are auto-inferred from <code>-s</code> when the dataset follows
+          the standard layout. For full control over loss weights and optimization, pass your own YAML file:
+        </p>
+        <pre><code>uv run python train.py \
+  --config path/to/your_config.yaml \
+  -s datasets/processed/topbrain/topcow_ct_001/views/v2_ap_lat \
+  -m results/2v_experiment \
+  --Nviews 2 --seed 42</code></pre>
+
+        <p>Key flags:</p>
+        <ul>
+          <li><code>-s</code> &mdash; path to the dataset folder containing <code>transforms.json</code> and projections</li>
+          <li><code>--Nviews</code> &mdash; number of training views (must match the dataset)</li>
+          <li><code>--config</code> &mdash; optional YAML file for loss weights, iterations, and optimization</li>
+          <li><code>--ply_path</code> &mdash; CTA-derived vessel prior (auto-inferred if omitted)</li>
+          <li><code>--residuals_path</code> &mdash; residual point cloud (auto-inferred if omitted)</li>
+          <li><code>--seed</code> &mdash; random seed for reproducibility</li>
+        </ul>
+
+        <p>Short smoke run:</p>
+        <pre><code>uv run python train.py \
+  -s datasets/processed/topbrain/topcow_ct_001/views/v2_ap_lat \
+  -m results/2v_experiment_10k \
+  --Nviews 2 --seed 42 \
+  --iterations 10000 --densify_until_iter 5000</code></pre>
+
+        <h2><span class="step-num">6</span> Evaluate</h2>
+        <pre><code>uv run python test.py -m results/2v_experiment --VQR --render_2d --seed 42</code></pre>
+
+        <p>This produces:</p>
+        <ul>
+          <li><strong>3D mesh metrics</strong> &mdash; Chamfer Distance and Hausdorff Distance in mm</li>
+          <li><strong>Predicted vessel mesh</strong> &mdash; the reconstructed 3D vessel geometry as an OBJ file</li>
+          <li><strong>2D rendering metrics</strong> &mdash; PSNR and SSIM for the input projections</li>
+        </ul>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Next Steps</div>
+          <p>
+            See <a href="dataset-schema.html">Dataset Format</a> for the generated layout,
+            <a href="architecture.html">How It Works</a> for the reconstruction pipeline,
+            and <a href="clinical-data.html">Clinical Data</a> for the supported clinical export path.
+          </p>
+        </div>
+
+        <footer class="footer">
+          3D Cerebrovascular Shape Completion documentation.
+        </footer>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

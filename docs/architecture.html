@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How It Works | 3D Cerebrovascular Shape Completion</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <main class="wrap">
+    <div class="doc-layout">
+      <nav class="sidebar">
+        <a href="index.html">&larr; Project Page</a>
+        <div class="sidebar-title">Guides</div>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="clinical-data.html">Clinical Data</a>
+        <div class="sidebar-title">Reference</div>
+        <a href="dataset-schema.html">Dataset Format</a>
+        <a class="active" href="architecture.html">How It Works</a>
+      </nav>
+      <div class="doc-content">
+        <section class="hero">
+          <span class="eyebrow">Reference</span>
+          <h1>How It Works</h1>
+          <p class="lede">
+            An overview of the reconstruction pipeline, the options you can configure,
+            and how the synthetic and clinical data paths feed the same training code.
+          </p>
+        </section>
+
+        <figure style="margin: 0 0 2rem;">
+          <img src="./assets/method.png" alt="Method Overview"
+            style="width: 100%; height: auto; border-radius: 0.75rem;" />
+          <figcaption>
+            CTA priors and sparse DSA projections initialize and guide Gaussian-based
+            shape completion, which is optimized against the observed views and converted
+            into a final 3D vessel mesh.
+          </figcaption>
+        </figure>
+
+        <h2>The Reconstruction Pipeline</h2>
+        <p>
+          The method takes sparse 2D X-ray projections and produces a 3D vessel mesh.
+          The key idea is to use a preoperative CTA scan as a structural prior that anchors the reconstruction,
+          turning the problem from unconstrained 3D inference into guided shape completion.
+        </p>
+        <p>At a high level, the pipeline is:</p>
+        <ol>
+          <li><strong>CTA Prior Extraction</strong> &mdash; a vessel segmentation from CTA is converted into a 3D point cloud.</li>
+          <li><strong>Gaussian Initialization</strong> &mdash; 3D Gaussians are seeded from the prior points and optional context points.</li>
+          <li><strong>Optimization</strong> &mdash; the Gaussians are optimized to match the input DSA projections.</li>
+          <li><strong>Mesh Extraction</strong> &mdash; the final opacity field is queried on a voxel grid and converted to a vessel mesh via marching cubes.</li>
+        </ol>
+
+        <h2>Initialization Options</h2>
+        <p>The initial Gaussian set is built from two populations:</p>
+        <ul>
+          <li>
+            <strong>M1 &mdash; Anatomical prior</strong> (always used):
+            points sampled from the CTA vessel segmentation. This is the backbone of the reconstruction.
+            Controlled by <code>--ply_path</code> and the <code>M1</code> point budget.
+          </li>
+          <li>
+            <strong>M2 &mdash; Context points</strong> (optional, recommended):
+            additional points that help reconstruct vessels not covered by the CTA prior.
+            Available modes are residual, uniform, and FDK-based initialization.
+          </li>
+        </ul>
+
+        <h2>Loss Functions</h2>
+        <p>Training uses a combination of losses, each configurable through the CLI and optional YAML config:</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Loss</th>
+              <th>Purpose</th>
+              <th>Typical Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>L1</td>
+              <td>Pixel-level reconstruction accuracy</td>
+              <td>0.93</td>
+            </tr>
+            <tr>
+              <td>DSSIM</td>
+              <td>Structural similarity</td>
+              <td>0.07</td>
+            </tr>
+            <tr>
+              <td>Prior Anchoring</td>
+              <td>Keeps Gaussians close to the CTA geometry</td>
+              <td>0.0025</td>
+            </tr>
+            <tr>
+              <td>FN Loss</td>
+              <td>Penalizes missing vessels in the rendered projections</td>
+              <td>configurable</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Evaluation Metrics</h2>
+        <p>Two types of metrics are computed:</p>
+        <ul>
+          <li><strong>2D Rendering Quality</strong> &mdash; PSNR and SSIM on re-rendered projections.</li>
+          <li><strong>3D Mesh Accuracy</strong> &mdash; Chamfer Distance and Hausdorff Distance in mm against the reference anatomy.</li>
+        </ul>
+        <p>When a CTA prior is available, the 3D metrics are partitioned into:</p>
+        <ul>
+          <li><strong>Missing region</strong> &mdash; vessels not covered by the prior</li>
+          <li><strong>Prior region</strong> &mdash; vessels already present in the CTA prior</li>
+        </ul>
+
+        <h2>Configuration</h2>
+        <p>
+          Training settings can be controlled directly from the CLI or through your own YAML config passed to
+          <code>train.py --config</code>. Settings are layered in this order:
+        </p>
+        <ol>
+          <li>Built-in defaults</li>
+          <li>Your <code>--config</code> YAML file</li>
+          <li>Command-line flags</li>
+        </ol>
+        <p>Common controls include:</p>
+        <ul>
+          <li><strong>Loss weights</strong> &mdash; balance between L1, DSSIM, prior anchoring, and FN loss</li>
+          <li><strong>Iteration count</strong> &mdash; total optimization steps</li>
+          <li><strong>Point budgets</strong> &mdash; M1 and M2 initialization sizes</li>
+          <li><strong>Densification schedule</strong> &mdash; when to stop adding or splitting Gaussians</li>
+          <li><strong>Opacity field type</strong> &mdash; the neural field architecture used for opacity prediction</li>
+        </ul>
+
+        <h2>Clinical Data Pipeline</h2>
+        <p>
+          In addition to the synthetic TopBrain pipeline, the repository supports real clinical DSA data through
+          the <code>data_generation.clinical</code> module. The clinical pipeline converts registered DSA acquisitions
+          into the same training format used by the synthetic data path.
+        </p>
+        <ol>
+          <li><strong>DICOM to DSA MIP</strong> &mdash; load angiography stacks, subtract mask and fill phases, and form MIPs.</li>
+          <li><strong>CTA Prior Extraction</strong> &mdash; extract vessel voxels from CTA segmentation and convert them to world coordinates.</li>
+          <li><strong>Visual Hull Filtering</strong> &mdash; remove prior points inconsistent with the 2D DSA evidence.</li>
+          <li><strong>Dataset Export</strong> &mdash; write <code>transforms.json</code>, projections, priors, and optional residual point clouds.</li>
+        </ol>
+        <p>
+          The exported clinical dataset uses the same training interface as the synthetic pipeline.
+          See <a href="clinical-data.html">Clinical Data</a> for the full guide.
+        </p>
+
+        <h2>View Configurations</h2>
+        <p>
+          The system supports different numbers of input views. More views typically improve reconstruction quality,
+          but require more acquisitions.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Configuration</th>
+              <th>Views</th>
+              <th>Angles</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2-view (AP + LAT)</td>
+              <td>2</td>
+              <td>Anteroposterior + lateral</td>
+            </tr>
+            <tr>
+              <td>3-view standard</td>
+              <td>3</td>
+              <td>AP + lateral + oblique</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Prior Thickness Settings</h2>
+        <p>
+          The CTA prior can be filtered by vessel diameter. Thinner thresholds retain more anatomy,
+          while thicker thresholds provide a cleaner but less complete prior.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Setting</th>
+              <th>Threshold</th>
+              <th>Typical Coverage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>All vessels</td>
+              <td>none</td>
+              <td>highest</td>
+            </tr>
+            <tr>
+              <td>&gt; 1.0 mm</td>
+              <td>1.0 mm</td>
+              <td>high</td>
+            </tr>
+            <tr>
+              <td>&gt; 1.5 mm</td>
+              <td>1.5 mm</td>
+              <td>medium</td>
+            </tr>
+            <tr>
+              <td>&gt; 2.0 mm</td>
+              <td>2.0 mm</td>
+              <td>lower</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <footer class="footer">
+          3D Cerebrovascular Shape Completion documentation.
+        </footer>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

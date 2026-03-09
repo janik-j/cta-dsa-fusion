@@ -1,0 +1,13 @@
+# Central repo config (kept intentionally minimal).
+#
+# These paths are repo-relative by default; edit them if your datasets/results live elsewhere.
+
+paths:
+  # Processed public TopBrain dataset root.
+  datasets_dir: datasets/processed
+
+  # Raw public TopBrain CTA dataset root.
+  raw_datasets_dir: datasets/raw
+
+  # All training outputs (suite runs and standalone train.py)
+  results_dir: results

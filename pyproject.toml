@@ -1,0 +1,134 @@
+[project]
+name = "cta-dsa-fusion"
+version = "0.1.0"
+description = "3D Cerebrovascular Shape Completion from Biplane Angiography and CTA Prior"
+readme = "README.md"
+authors = [{name = "Janik Alexander Jehkul"}]
+license = {text = "MIT"}
+requires-python = ">=3.10,<3.11"
+keywords = ["gaussian-splatting", "3d-reconstruction", "medical-imaging", "dsa", "cta", "vessel-reconstruction"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "crackle-codec==0.36.0",
+    "diff-xray-gaussian-rasterization-voxelization",
+    "kimimaro==5.8.1",
+    "matplotlib==3.7.5",
+    "numpy==1.26.4",
+    "opencv-python-headless==4.11.0.86",
+    "pandas==2.2.3",
+    "pydicom==3.0.1",
+    "pylibjpeg>=2.0",
+    "pylibjpeg-libjpeg>=2.1",
+    "plyfile==1.0.3",
+    "PyMCubes==0.1.4",
+    "pyhocon==0.3.61",
+    "pytigre",
+    "pyvista==0.47.1",
+    "PyYAML==6.0.2",
+    "scikit-image==0.21.0",
+    "scipy==1.10.1",
+    "setuptools==72.1.0",
+    "simple-knn",
+    "SimpleITK==2.4.0",
+    "tinycudann",
+    "torch==2.1.2+cu118",
+    "tqdm==4.66.5",
+    "wandb==0.16.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9,<1",
+]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+dependency-metadata = [
+    { name = "diff-xray-gaussian-rasterization-voxelization", version = "0.0.0", requires-dist = [] },
+    { name = "pytigre", version = "3.0.0", requires-dist = ["Cython", "h5py", "matplotlib", "numpy", "scipy", "tqdm"] },
+    { name = "simple-knn", version = "0.0.0", requires-dist = [] },
+    { name = "tinycudann", version = "2.0", requires-dist = [] },
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu118" }
+diff-xray-gaussian-rasterization-voxelization = { path = "submodules/diff-Xray-gaussian-rasterization-voxelization", editable = true }
+simple-knn = { path = "submodules/simple-knn", editable = true }
+pytigre = { git = "https://github.com/CERN/TIGRE.git", tag = "v3.0", subdirectory = "Python" }
+tinycudann = { git = "https://github.com/NVlabs/tiny-cuda-nn.git", tag = "v2.0", subdirectory = "bindings/torch" }
+
+[tool.uv.extra-build-dependencies]
+diff-xray-gaussian-rasterization-voxelization = [
+    "numpy==1.26.4",
+    "setuptools==72.1.0",
+    "torch==2.1.2+cu118",
+]
+simple-knn = [
+    "numpy==1.26.4",
+    "setuptools==72.1.0",
+    "torch==2.1.2+cu118",
+]
+tinycudann = [
+    "numpy==1.26.4",
+    "setuptools==72.1.0",
+    "torch==2.1.2+cu118",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+exclude = [
+    "submodules/",
+    ".git",
+    "__pycache__",
+    "*.egg-info",
+    "build/",
+    "dist/",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "PIE",    # flake8-pie
+    "RUF",    # ruff-specific
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "E731",   # lambda assignment (sometimes useful)
+    "B008",   # function call in default arg (common in argparse)
+    "B905",   # zip strict (py3.10+ but not always needed)
+    "SIM108", # ternary instead of if-else (readability)
+    "UP007",  # use X | Y for Union (compatibility)
+]
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["scene", "utils", "arguments", "gaussian_renderer_voxelizer", "ct", "data_generation"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

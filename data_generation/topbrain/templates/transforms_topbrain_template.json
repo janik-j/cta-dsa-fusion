@@ -1,0 +1,8 @@
+{
+    "sid": 700.0,
+    "sad": 500.0,
+    "proj_resolution": [512, 512],
+    "proj_phy": [256.0, 256.0],
+    "proj_spacing": [0.5, 0.5],
+    "volume_resolution": [256, 256, 256]
+}

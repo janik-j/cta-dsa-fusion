@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clinical Data | 3D Cerebrovascular Shape Completion</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <main class="wrap">
+    <div class="doc-layout">
+      <nav class="sidebar">
+        <a href="index.html">&larr; Project Page</a>
+        <div class="sidebar-title">Guides</div>
+        <a href="getting-started.html">Getting Started</a>
+        <a class="active" href="clinical-data.html">Clinical Data</a>
+        <div class="sidebar-title">Reference</div>
+        <a href="dataset-schema.html">Dataset Format</a>
+        <a href="architecture.html">How It Works</a>
+      </nav>
+      <div class="doc-content">
+        <section class="hero">
+          <span class="eyebrow">Guide</span>
+          <h1>Clinical Data</h1>
+          <p class="lede">
+            Generate clinical training datasets from registered DSA acquisitions and CTA-derived vessel priors.
+            The repository supports this pipeline directly; patient data and registration outputs must be supplied by the user.
+          </p>
+        </section>
+
+        <h2><span class="step-num">1</span> Prerequisites</h2>
+        <p>
+          Use the same repo environment as the synthetic TopBrain pipeline:
+        </p>
+        <pre><code>uv python install 3.10
+./scripts/uv.sh sync --verify</code></pre>
+        <p>
+          The default environment already includes the required clinical readers such as <code>pydicom</code>
+          and <code>SimpleITK</code>.
+        </p>
+
+        <h3>Upstream Registration</h3>
+        <p>
+          Before running this pipeline, each DSA acquisition must be registered to the CTA volume.
+          In the original study, this step was performed with X-ray/volume registration tooling outside this repository.
+          The export expects a <code>parameters.pt</code> file per view containing the final camera pose and projection geometry.
+        </p>
+
+        <h3>What <code>parameters.pt</code> Must Contain</h3>
+        <p>The registration checkpoint is expected to contain the following information:</p>
+        <ul>
+          <li><strong>final_pose</strong> &mdash; 4&times;4 camera-to-world matrix</li>
+          <li><strong>drr.sdd</strong> &mdash; source-to-detector distance in mm</li>
+          <li><strong>drr.delx</strong> and <strong>drr.dely</strong> &mdash; detector pixel spacing in mm</li>
+          <li><strong>drr.height</strong> and <strong>drr.width</strong> &mdash; detector dimensions</li>
+          <li><strong>drr.reverse_x_axis</strong> &mdash; coordinate handedness flag</li>
+          <li><strong>xray.crop</strong> &mdash; projection crop applied during registration</li>
+          <li><strong>xray.mask_frames</strong> and <strong>xray.fill_frames</strong> &mdash; pre-contrast and contrast-fill frame indices</li>
+        </ul>
+
+        <h2><span class="step-num">2</span> Expected Input Layout</h2>
+        <p>
+          Patient data must be organized under a <code>raw_root</code> directory with the following layout:
+        </p>
+        <pre><code>&lt;raw_root&gt;/&lt;patient_id&gt;/
+  cta.nii.gz
+  segmentation/
+    vessel.seg.nrrd
+  &lt;artery&gt;/
+    &lt;view&gt;.dcm
+    &lt;view&gt;/
+      parameters.pt
+    &lt;view&gt;_masks/
+      frame_000.nii.gz
+      frame_001.nii.gz
+      ...</code></pre>
+
+        <div class="callout">
+          <div class="callout-title">Data Organization</div>
+          <p>
+            Each artery has its own subdirectory under the patient folder. Inside it,
+            each view is a DICOM file plus a subdirectory with the registration parameters.
+          </p>
+          <ul>
+            <li><code>lica/ap.dcm</code> + <code>lica/ap/parameters.pt</code> &mdash; left ICA, anteroposterior</li>
+            <li><code>lica/lat.dcm</code> + <code>lica/lat/parameters.pt</code> &mdash; left ICA, lateral</li>
+          </ul>
+          <p>
+            Specify the artery and views on the CLI, for example <code>--artery lica --views ap lat</code>.
+          </p>
+        </div>
+
+        <h2><span class="step-num">3</span> Segmentation Inputs</h2>
+        <p>The pipeline expects two types of segmentation:</p>
+
+        <h3>CTA Vessel Segmentation</h3>
+        <p>
+          A 3D vessel label map at <code>segmentation/vessel.seg.nrrd</code> in NRRD format.
+          The pipeline extracts voxels matching <code>--vessel-label</code> (default <code>2</code>)
+          to build the prior mesh and point cloud. The segmentation must share the CTA coordinate space.
+        </p>
+
+        <h3>DSA Per-Frame Masks (Optional)</h3>
+        <p>
+          Per-frame binary vessel masks at <code>&lt;artery&gt;/&lt;view&gt;_masks/frame_000.nii.gz</code>,
+          <code>frame_001.nii.gz</code>, and so on. These are used for background suppression and visual-hull filtering.
+          The pipeline runs without them, but the prior filtering is better when masks are available.
+        </p>
+
+        <h2><span class="step-num">4</span> Pipeline Overview</h2>
+        <p>
+          The clinical pipeline converts registered DSA data into the same training format used by the synthetic path:
+        </p>
+        <ol>
+          <li><strong>DICOM loading</strong> &mdash; read the angiography stack, registration parameters, and frame ranges.</li>
+          <li><strong>Frame selection</strong> &mdash; select a fill-frame range relative to the first contrast frame.</li>
+          <li><strong>DSA MIP computation</strong> &mdash; compute per-frame DSA, optionally mask it, and collapse the selected frames into a MIP.</li>
+          <li><strong>Prior loading</strong> &mdash; extract vessel voxels from CTA segmentation and convert them into world-space points.</li>
+          <li><strong>Visual hull filtering</strong> &mdash; remove prior points inconsistent with the 2D masks across views.</li>
+          <li><strong>Dataset export</strong> &mdash; write <code>transforms.json</code>, projections, priors, geometry, and optional residuals.</li>
+        </ol>
+
+        <h2><span class="step-num">5</span> CLI Reference</h2>
+        <pre><code>uv run python -m data_generation.clinical.cli \
+  --patient-id case_1 \
+  --artery lica --views ap lat \
+  --mip-offset-start 3 --mip-offset-end 15</code></pre>
+
+        <h3>Required Arguments</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Flag</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--patient-id</code></td>
+              <td>Patient identifier under the configured clinical raw-data root.</td>
+            </tr>
+            <tr>
+              <td><code>--artery</code></td>
+              <td>Artery name such as <code>lica</code> or <code>lvert</code>.</td>
+            </tr>
+            <tr>
+              <td><code>--views</code></td>
+              <td>One or more view names such as <code>ap lat</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Phase and Path Options</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Flag</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--mip-offset-start</code></td>
+              <td><code>3</code></td>
+              <td>Start offset from the first fill frame for MIP generation.</td>
+            </tr>
+            <tr>
+              <td><code>--mip-offset-end</code></td>
+              <td><code>15</code></td>
+              <td>End offset from the first fill frame. Use <code>0</code> for all remaining frames.</td>
+            </tr>
+            <tr>
+              <td><code>--zoom-factor</code></td>
+              <td><code>1.0</code></td>
+              <td>Projection zoom factor applied before export.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          Input and output roots are read from <code>project.yaml</code> automatically.
+        </p>
+
+        <h3>Visual Hull and Prior Options</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Flag</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--vh-mask-dilate-px</code></td>
+              <td><code>0</code></td>
+              <td>Dilate 2D masks by N pixels before visual-hull testing.</td>
+            </tr>
+            <tr>
+              <td><code>--vessel-label</code></td>
+              <td><code>2</code></td>
+              <td>Label ID to extract from the CTA vessel segmentation.</td>
+            </tr>
+            <tr>
+              <td><code>--max-points</code></td>
+              <td><code>100000</code></td>
+              <td>Maximum number of prior points sampled from the filtered prior surface.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Residual (M2) Options</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Flag</th>
+              <th>Default</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>--no-export-residuals</code></td>
+              <td>disabled</td>
+              <td>Turn off residual point-cloud export.</td>
+            </tr>
+            <tr>
+              <td><code>--residual-voxel-size-mm</code></td>
+              <td><code>2.0</code></td>
+              <td>Voxel size used for residual backprojection.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2><span class="step-num">6</span> Output Format</h2>
+        <p>
+          The pipeline produces a dataset directory compatible with the standard training pipeline:
+        </p>
+        <pre><code>&lt;export_root&gt;/&lt;patient_id&gt;/lica/
+  transforms.json
+  projections/
+    mask_run.nii.gz
+    fill_run.nii.gz
+    DSA.nii.gz
+  priors/
+    vessel_lica_prior.ply
+  geometry/
+    mesh_ref.obj
+    mesh_ref_filtered.obj
+  residuals/
+    fdk_residual.ply
+    intersected_fdk_residual.ply</code></pre>
+
+        <p>
+          The <code>transforms.json</code> uses <code>pose_type: "world2cam_4x4"</code> with per-frame camera matrices
+          and detector geometry. See <a href="dataset-schema.html">Dataset Format</a> for the full schema.
+        </p>
+
+        <h2><span class="step-num">7</span> Frame Selection</h2>
+        <p>
+          The <code>--mip-offset-start</code> and <code>--mip-offset-end</code> flags select which fill frames
+          are included in the MIP, specified as offsets from the first contrast frame.
+        </p>
+        <ul>
+          <li><code>--mip-offset-start 3 --mip-offset-end 15</code> selects 12 early arterial frames.</li>
+          <li><code>--mip-offset-start 0 --mip-offset-end 0</code> uses all contrast frames.</li>
+        </ul>
+        <p>
+          Set <code>--mip-offset-end 0</code> to include all remaining frames from the start offset onward.
+        </p>
+
+        <h2><span class="step-num">8</span> Visual Hull Filtering</h2>
+        <p>
+          Visual hull filtering removes prior points that are inconsistent with the observed 2D segmentation masks.
+          Each 3D prior point is projected into every calibrated 2D mask, and only points visible in all views pass the filter.
+        </p>
+        <p>
+          Use <code>--vh-mask-dilate-px</code> to dilate the 2D masks before projection when the masks are slightly conservative.
+        </p>
+
+        <h2><span class="step-num">9</span> Prior Source</h2>
+        <p>
+          The prior is generated by extracting a surface from the CTA vessel segmentation, optionally filtering it with the visual hull,
+          and sampling points from the resulting mesh. This produces the M1 initialization used by training.
+        </p>
+
+        <h2><span class="step-num">10</span> Residual (M2) Generation</h2>
+        <p>
+          When residual export is enabled, the pipeline generates additional point clouds that capture vessel regions visible in DSA
+          but missing from the CTA prior. These serve as M2 context points during training.
+        </p>
+        <ol>
+          <li>Project the prior into each DSA view to mask out already explained anatomy.</li>
+          <li>Subtract the explained region from the DSA MIP to obtain per-view residual maps.</li>
+          <li>Backproject the residual maps into a coarse 3D volume.</li>
+          <li>Threshold the volume and export <code>fdk_residual.ply</code> and <code>intersected_fdk_residual.ply</code>.</li>
+        </ol>
+
+        <h2><span class="step-num">11</span> Training with Clinical Data</h2>
+        <p>
+          The exported dataset is consumed by the standard training pipeline. The clinical export command prints
+          a ready-to-run training command, including the prior and residual paths when they were generated.
+          The equivalent manual command is:
+        </p>
+        <pre><code>uv run python train.py \
+  -s datasets/processed/clinical/case_1/lica \
+  -m results/clinical_experiment \
+  --Nviews 2 --seed 42 \
+  --ply_path datasets/processed/clinical/case_1/lica/priors/vessel_lica_prior.ply \
+  --residuals_path datasets/processed/clinical/case_1/lica/residuals/intersected_fdk_residual.ply</code></pre>
+
+        <p>
+          As with the synthetic path, prior and residual paths can also be inferred automatically when the
+          standard folder layout or <code>transforms.json</code> metadata is present.
+        </p>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Related Pages</div>
+          <p>
+            See <a href="dataset-schema.html">Dataset Format</a> for the shared training layout and
+            <a href="architecture.html">How It Works</a> for the reconstruction and initialization pipeline.
+          </p>
+        </div>
+
+        <footer class="footer">
+          3D Cerebrovascular Shape Completion documentation.
+        </footer>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

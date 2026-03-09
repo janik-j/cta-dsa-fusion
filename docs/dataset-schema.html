@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dataset Format | 3D Cerebrovascular Shape Completion</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <main class="wrap">
+    <div class="doc-layout">
+      <nav class="sidebar">
+        <a href="index.html">&larr; Project Page</a>
+        <div class="sidebar-title">Guides</div>
+        <a href="getting-started.html">Getting Started</a>
+        <a href="clinical-data.html">Clinical Data</a>
+        <div class="sidebar-title">Reference</div>
+        <a class="active" href="dataset-schema.html">Dataset Format</a>
+        <a href="architecture.html">How It Works</a>
+      </nav>
+      <div class="doc-content">
+        <section class="hero">
+          <span class="eyebrow">Reference</span>
+          <h1>Dataset Format</h1>
+          <p class="lede">
+            Every training run consumes a single dataset folder. This page
+            describes what that folder must contain and how the metadata file
+            is structured.
+          </p>
+        </section>
+
+        <h2>Folder Structure</h2>
+        <p>Point the <code>-s</code> flag at a folder with this layout:</p>
+        <pre><code>my_dataset/
+  transforms.json            # camera poses, imaging geometry, metadata
+  projections/
+    mask_run.nii.gz          # mask-run X-ray projections (3D NIfTI stack)
+    fill_run.nii.gz          # contrast-fill-run X-ray projections
+  mesh_ref.obj               # optional ground-truth vessel mesh for evaluation</code></pre>
+        <p>
+          Only <code>mask_run</code> and <code>fill_run</code> are required.
+          The DSA images are computed automatically from the projection pair during training.
+          If a ground-truth mesh is provided, 3D evaluation metrics such as Chamfer Distance and Hausdorff Distance can be computed.
+        </p>
+
+        <h2>Metadata File</h2>
+        <p>
+          The <code>transforms.json</code> file describes the imaging geometry and camera poses.
+          Here is a complete working example for a 2-view setup:
+        </p>
+        <pre><code>{
+  "pose_type": "angles_rad",
+  "dsa_convention": "fill_minus_mask",
+  "N_views": 2,
+
+  "sid": 700.0,
+  "sad": 500.0,
+
+  "proj_resolution": [512, 512],
+  "proj_phy": [256.0, 256.0],
+  "proj_spacing": [0.5, 0.5],
+
+  "volume_resolution": [256, 256, 256],
+  "volume_spacing": [0.5, 0.5, 0.5],
+  "volume_phy": [128.0, 128.0, 128.0],
+
+  "frames": [
+    {
+      "file": "ap",
+      "PrimaryAngle": 0.0,
+      "SecondaryAngle": 0.0
+    },
+    {
+      "file": "lat",
+      "PrimaryAngle": 1.5707963,
+      "SecondaryAngle": 0.0
+    }
+  ]
+}</code></pre>
+
+        <h2>Required Fields</h2>
+
+        <h3>Imaging Geometry</h3>
+        <ul>
+          <li><strong>sid</strong> &mdash; source-to-isocenter distance in mm</li>
+          <li><strong>sad</strong> &mdash; source-to-axis distance in mm</li>
+          <li><strong>proj_resolution</strong> &mdash; projection image size in pixels</li>
+          <li><strong>proj_phy</strong> &mdash; physical projection dimensions in mm</li>
+          <li><strong>proj_spacing</strong> &mdash; pixel spacing in mm</li>
+          <li><strong>volume_resolution</strong> &mdash; reconstruction volume size in voxels</li>
+          <li><strong>volume_spacing</strong> &mdash; voxel spacing in mm</li>
+          <li><strong>volume_phy</strong> &mdash; physical volume dimensions in mm</li>
+        </ul>
+
+        <h3>Acquisition Settings</h3>
+        <ul>
+          <li><strong>pose_type</strong> &mdash; how poses are specified: <code>angles_rad</code> or <code>world2cam_4x4</code></li>
+          <li><strong>dsa_convention</strong> &mdash; subtraction convention such as <code>fill_minus_mask</code> or <code>log_fill_minus_mask</code></li>
+          <li><strong>N_views</strong> &mdash; number of input views</li>
+        </ul>
+
+        <h3>Per-View Frames</h3>
+        <p>
+          The <code>frames</code> list must contain at least <code>N_views</code> entries.
+          Each frame describes one camera pose.
+        </p>
+
+        <div class="grid two-col">
+          <div class="card">
+            <h3>Angle-Based Poses</h3>
+            <p>Used for synthetic TopBrain data.</p>
+            <ul>
+              <li><strong>file</strong> &mdash; frame identifier</li>
+              <li><strong>PrimaryAngle</strong> &mdash; C-arm primary rotation in radians</li>
+              <li><strong>SecondaryAngle</strong> &mdash; cranio-caudal angle in radians</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Matrix-Based Poses</h3>
+            <p>Used for registered clinical data.</p>
+            <ul>
+              <li><strong>file</strong> &mdash; frame identifier</li>
+              <li><strong>world2cam</strong> &mdash; 4&times;4 world-to-camera matrix</li>
+              <li><strong>R</strong> + <strong>T</strong> &mdash; alternative matrix decomposition</li>
+            </ul>
+          </div>
+        </div>
+
+        <h2>Optional Fields</h2>
+        <ul>
+          <li><strong>volume_origin</strong> &mdash; volume origin offset in mm</li>
+          <li><strong>geometry</strong> &mdash; reference mesh path and coordinate-space metadata</li>
+          <li><strong>priors</strong> &mdash; prior point cloud metadata</li>
+        </ul>
+
+        <h2>Processed Dataset Layout</h2>
+
+        <h3>Synthetic TopBrain</h3>
+        <p>
+          The synthetic pipeline produces a case-root structure with view, prior, and residual sweeps.
+          The training folder passed to <code>-s</code> is the view directory:
+        </p>
+        <pre><code>datasets/processed/topbrain/topcow_ct_001/
+  geometry/
+  views/
+    v2_ap_lat/            # pass this to -s for 2-view training
+    v3_standard/          # pass this to -s for 3-view training
+  priors/
+    p_gt1p5mm/
+  residuals/
+    v2_ap_lat__p_gt1p5mm/</code></pre>
+
+        <h3>Clinical DSA</h3>
+        <p>
+          The clinical pipeline (<a href="clinical-data.html">Clinical Data</a>) produces
+          a single dataset folder per patient and artery configuration:
+        </p>
+        <pre><code>datasets/processed/clinical/case_1/lica/
+  transforms.json         # pose_type: world2cam_4x4
+  projections/
+    mask_run.nii.gz       # [N_views, H, W]
+    fill_run.nii.gz       # [N_views, H, W]
+    DSA.nii.gz            # segmentation-masked MIP
+  priors/
+    vessel_lica_prior.ply
+  geometry/
+    mesh_ref.obj
+  residuals/              # optional
+    fdk_residual.ply
+    intersected_fdk_residual.ply</code></pre>
+        <p>This folder is passed directly to <code>-s</code> for training.</p>
+
+        <footer class="footer">
+          3D Cerebrovascular Shape Completion documentation.
+        </footer>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D Cerebrovascular Shape Completion from Biplane Angiography and CTA Prior</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+
+<body>
+  <main class="wrap">
+
+    <!-- ======== Hero ======== -->
+    <section class="hero">
+      <span class="eyebrow">Project</span>
+      <h1>3D Cerebrovascular Shape Completion from Biplane Angiography and CTA Prior</h1>
+      <p class="lede">
+        We propose a novel approach to bridge the resolution and dimensionality gap between CTA, which provides 3D
+        vascular geometry but often misses small vessels, and biplanar 2D DSA, which offers higher spatial resolution
+        but lacks 3D structural information, by formulating the problem as a 3D shape completion task.
+        Our method represents vasculature using a set of 3D Gaussians initialized from CTA-derived vessel geometry and
+        augmented with additional spatial and opacity primitives seeded from two DSA projections. These Gaussians
+        jointly encode geometry and attenuation and are optimized to fit the observed DSA images while remaining
+        consistent with the original CTA anatomy.
+        Experiments on synthetic and clinical cerebrovascular data demonstrate improved 3D reconstruction of small
+        vessel branches at submillimetric resolution, validating the use of DSA to complement missing CTA vessel
+        anatomy.
+      </p>
+
+      <div class="actions">
+        <a class="button" href="https://github.com/janik-j/cta-dsa-fusion">
+          <svg style="width:1.15rem;height:1.15rem;fill:currentColor;" viewBox="0 0 16 16">
+            <path
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
+            </path>
+          </svg>
+          Code
+        </a>
+        <a class="button-secondary" href="getting-started.html">Documentation</a>
+        <a class="button-secondary" href="#method">Method</a>
+        <a class="button-secondary" href="#results">Results</a>
+        <a class="button-secondary" href="#video">Video</a>
+      </div>
+      <p style="margin-top: 1rem; font-size: 0.95rem; color: #4b5563;">
+        The repository includes the public training and evaluation pipeline together with the static project
+        documentation hosted on this page.
+      </p>
+    </section>
+
+    <!-- ======== Method ======== -->
+    <section class="section" id="method">
+      <article class="card">
+        <h2 class="section-title">Method Overview</h2>
+        <figure>
+          <img src="./assets/method.png" alt="Method Overview"
+            style="width: 100%; height: auto; border-radius: 0.5rem;" />
+          <figcaption>
+            CTA priors obtained by segmentation in <strong>(a)</strong> and DSA
+            back-projection context points in <strong>(b)</strong> are used to initialize
+            Gaussians that are optimized under a composite loss in <strong>(c)</strong>,
+            leading to the final vessel reconstruction in <strong>(d)</strong>.
+          </figcaption>
+        </figure>
+      </article>
+    </section>
+
+    <!-- ======== Clinical Evaluation ======== -->
+    <section class="section" id="video">
+      <h2 class="section-title">Clinical Evaluation</h2>
+      <div class="grid two-col">
+        <article class="card">
+          <h3 style="text-align: center; margin-bottom: 1rem;">Qualitative Evaluation on Clinical Data</h3>
+          <figure>
+            <img src="./assets/clinical_results.png"
+              alt="Clinical DSA with CTA prior (red) and newly recovered vessels (gray)"
+              style="width: 100%; height: auto; border-radius: 0.5rem;" loading="lazy" />
+            <figcaption>
+              <strong>Qualitative evaluation on clinical data.</strong>
+              The top two rows show patient P1 in LAT and AP views, respectively.
+              From left to right: input DSA projections, prior CTA mesh, completed
+              mesh using our method shown from two angles
+              (prior vessels in <span style="color: #970015;">red</span>,
+              newly recovered vessels in <span style="color: #565656;">gray</span>),
+              and Gaussian renderings of the prior and completed meshes.
+              The bottom row shows patients P2 and P3, with completed meshes
+              visualized from three angles.
+            </figcaption>
+          </figure>
+        </article>
+        <article class="card">
+          <h3 style="text-align: center; margin-bottom: 1rem;">Dynamic 3D Result</h3>
+          <div class="video-wrap">
+            <img src="./assets/demo.gif" alt="Dynamic 3D Result Visualization" class="video-media" />
+          </div>
+          <figcaption style="margin-top: 0.8rem;"></figcaption>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======== Quantitative Results ======== -->
+    <section class="section" id="results">
+      <h2 class="section-title">Quantitative Results</h2>
+
+      <!-- SOTA comparison table -->
+      <article class="card">
+        <h3 style="margin-bottom: 0.5rem;">Comparison with State-of-the-Art</h3>
+        <p style="margin: 0 0 0.5rem; font-size: 0.92rem;">
+          Evaluated on 10 synthetic CTA scans from the TopBrain dataset. Metrics computed on the
+          missing vascular region (ROI) not covered by the CTA prior. Lower is better.
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th rowspan="2">Method</th>
+                <th colspan="2" style="text-align: center;">AP, LAT (2-view)</th>
+                <th colspan="2" style="text-align: center;">AP, LAT, Oblique (3-view)</th>
+              </tr>
+              <tr>
+                <th>CD<sub>ROI</sub>&thinsp;(mm)</th>
+                <th>HD<sub>ROI</sub>&thinsp;(mm)</th>
+                <th>CD<sub>ROI</sub>&thinsp;(mm)</th>
+                <th>HD<sub>ROI</sub>&thinsp;(mm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>DenoiseNet</td>
+                <td>2.30 &plusmn; 0.48</td>
+                <td>6.30 &plusmn; 1.82</td>
+                <td>&mdash;</td>
+                <td>&mdash;</td>
+              </tr>
+              <tr>
+                <td>R<sup>2</sup>-Gaussian</td>
+                <td>8.78 &plusmn; 1.97</td>
+                <td>24.70 &plusmn; 10.75</td>
+                <td>4.87 &plusmn; 1.93</td>
+                <td>18.71 &plusmn; 10.23</td>
+              </tr>
+              <tr>
+                <td>4DRGS</td>
+                <td>8.35 &plusmn; 2.57</td>
+                <td>23.40 &plusmn; 12.69</td>
+                <td>2.56 &plusmn; 1.38</td>
+                <td>8.50 &plusmn; 6.85</td>
+              </tr>
+              <tr class="best">
+                <td>Ours</td>
+                <td><strong>2.10 &plusmn; 0.35</strong></td>
+                <td><strong>4.53 &plusmn; 0.50</strong></td>
+                <td><strong>0.86 &plusmn; 0.11</strong></td>
+                <td><strong>1.68 &plusmn; 0.63</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          CD = Chamfer Distance, HD = Hausdorff Distance. Best results in <strong>bold</strong>.
+        </div>
+        <figure style="margin-top: 1.5rem;">
+          <img src="./assets/baseline_comparison.png"
+            alt="3D vessel reconstruction comparison: R2-Gaussian, 4DRGS, DenoiseNet, Ours (2v), Ours (3v), Reference"
+            style="width: 100%; height: auto; border-radius: 0.5rem;" loading="lazy" />
+          <figcaption>
+            <strong>Qualitative 3D reconstruction comparison (TopBrain case 001).</strong>
+            Each panel shows the predicted vessel mesh with CD/HD (mm) annotated;
+            corner insets highlight fine vessel detail. All methods show 2-view input;
+            rightmost shows 3-view.
+          </figcaption>
+        </figure>
+      </article>
+
+      <!-- Prior crossover analysis -->
+      <article class="card" style="margin-top: 1rem;">
+        <h3 style="text-align: center; margin-bottom: 1rem;">Prior Thickness Analysis</h3>
+        <figure>
+          <img src="./assets/prior_crossover.png"
+            alt="Prior thickness crossover: CD with and without CTA prior across vessel thickness thresholds"
+            style="width: 100%; height: auto; border-radius: 0.5rem;" loading="lazy" />
+          <figcaption>
+            Reconstruction accuracy with varying prior vessel thickness thresholds.
+          </figcaption>
+        </figure>
+      </article>
+
+      <!-- M2 init ablation table -->
+      <article class="card" style="margin-top: 1rem;">
+        <h3 style="margin-bottom: 0.5rem;">Context-Point Initialization Ablation</h3>
+        <p style="margin: 0 0 0.5rem; font-size: 0.92rem;">
+          The M2 context points complement the CTA-derived prior (M1). Residual Intersected FDK
+          initialization provides the strongest signal for recovering missing vessel regions.
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th rowspan="2">Initialization</th>
+                <th colspan="2" style="text-align: center;">AP, LAT (2-view)</th>
+                <th colspan="2" style="text-align: center;">AP, LAT, Oblique (3-view)</th>
+              </tr>
+              <tr>
+                <th>CD<sub>ROI</sub>&thinsp;(mm)</th>
+                <th>HD<sub>ROI</sub>&thinsp;(mm)</th>
+                <th>CD<sub>ROI</sub>&thinsp;(mm)</th>
+                <th>HD<sub>ROI</sub>&thinsp;(mm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>No M2 (M1 only)</td>
+                <td>3.62 &plusmn; 1.30</td>
+                <td>9.49 &plusmn; 3.50</td>
+                <td>1.26 &plusmn; 0.50</td>
+                <td>2.69 &plusmn; 1.69</td>
+              </tr>
+              <tr>
+                <td>Uniform</td>
+                <td>3.97 &plusmn; 1.11</td>
+                <td>10.31 &plusmn; 2.62</td>
+                <td>1.37 &plusmn; 0.42</td>
+                <td>3.07 &plusmn; 2.03</td>
+              </tr>
+              <tr>
+                <td>Residual FDK</td>
+                <td>2.99 &plusmn; 0.66</td>
+                <td>8.46 &plusmn; 2.34</td>
+                <td>0.95 &plusmn; 0.17</td>
+                <td>1.96 &plusmn; 1.21</td>
+              </tr>
+              <tr class="best">
+                <td>Res. Intersected FDK</td>
+                <td><strong>2.10 &plusmn; 0.35</strong></td>
+                <td><strong>4.53 &plusmn; 0.50</strong></td>
+                <td><strong>0.86 &plusmn; 0.11</strong></td>
+                <td><strong>1.68 &plusmn; 0.63</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <footer class="footer">
+      <a href="getting-started.html">Documentation</a>.
+    </footer>
+  </main>
+</body>
+
+</html>

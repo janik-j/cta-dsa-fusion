@@ -99,6 +99,7 @@ Start with the hosted documentation:
 - [TIGRE](https://github.com/CERN/TIGRE) — GPU-accelerated CT projection toolbox
 - [tiny-cuda-nn](https://github.com/NVlabs/tiny-cuda-nn) — neural network primitives for hash-grid opacity fields
 - [TopBrain](https://topbrain2025.grand-challenge.org/) — whole brain vessel segmentation challenge and CTA data source
+- [xvr](https://github.com/eigenvivek/xvr) — framework for rapid patient-specific 2D/3D X-ray-to-volume registration using differentiable rendering
 
 This codebase builds on the excellent open-source work above. Thanks for all these great projects.
 

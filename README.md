@@ -1,6 +1,6 @@
 # 3D Cerebrovascular Shape Completion from Biplane Angiography and CTA Prior
 
-## [Project Page](https://janik-j.github.io/cta-dsa-fusion/) | [Documentation](https://janik-j.github.io/cta-dsa-fusion/getting-started.html)
+## [Project Page](https://janik-j.github.io/cta-dsa-fusion/) | [Documentation](https://janik-j.github.io/cta-dsa-fusion/getting-started.html) | [PDF](https://papers.miccai.org/miccai-2026/paper/2705_paper.pdf) | [Paper Information and Reviews](https://papers.miccai.org/miccai-2026/0001-Paper2705.html) | [BibTeX](#citation)
 
 We propose a novel approach to bridge the resolution and dimensionality gap between CTA, which provides 3D vascular geometry but often misses small vessels, and biplanar 2D DSA, which offers higher spatial resolution but lacks 3D structural information, by formulating the problem as a 3D shape completion task. Our method represents vasculature using a set of 3D Gaussians initialized from CTA-derived vessel geometry and augmented with additional spatial and opacity primitives seeded from two DSA projections. These Gaussians jointly encode geometry and attenuation and are optimized to fit the observed DSA images while remaining consistent with the original CTA anatomy. Experiments on synthetic and clinical cerebrovascular data demonstrate improved 3D reconstruction of small vessel branches at submillimetric resolution, validating the use of DSA to complement missing CTA vessel anatomy.
 
@@ -105,7 +105,18 @@ This codebase builds on the excellent open-source work above. Thanks for all the
 
 ## Citation
 
-Citation metadata will be added once the paper citation is finalized.
+```bibtex
+@InProceedings{JehJan_3D_MICCAI2026,
+  author = {Jehkul, Janik AND Frisken, Sarah AND Gopalakrishnan, Vivek AND Rueckert, Daniel AND Haouchine, Nazim},
+  title = {{3D Cerebrovascular Shape Completion from Biplane Angiography and CTA Prior}},
+  booktitle = {Medical Image Computing and Computer Assisted Intervention -- MICCAI 2026},
+  year = {2026},
+  publisher = {Springer Nature Switzerland},
+  volume = {LNCS 16889},
+  month = {September},
+  pages = {pending},
+}
+```
 
 ## License
 
